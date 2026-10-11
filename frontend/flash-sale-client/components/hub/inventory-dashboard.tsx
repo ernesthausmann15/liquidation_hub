@@ -33,7 +33,9 @@ export function InventoryDashboard() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [summary, setSummary] = useState<InventorySummary | null>(null);
-  const [loading, setLoading] = useState(true);
+  /** Filter set the grid currently shows; loading is derived instead of set inside effects. */
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [query, setQuery] = useState("");
@@ -65,25 +67,33 @@ export function InventoryDashboard() {
     hubApi.summary().then(({ summary }) => setSummary(summary), handleError);
   }, [handleError]);
 
-  const load = useCallback(async () => {
+  const filterKey = JSON.stringify([debouncedQuery, category, status]);
+  const loading = loadedKey !== filterKey;
+
+  // A promise chain rather than async/await: state is only set in callbacks, never synchronously
+  // inside the effect that calls this (react-hooks/set-state-in-effect).
+  const load = useCallback(() => {
     const id = ++requestId.current;
-    setLoading(true);
-    try {
-      const [list, stats] = await Promise.all([
-        hubApi.list({ q: debouncedQuery, category, status: status || undefined }),
-        hubApi.summary(),
-      ]);
-      if (id !== requestId.current) return;
-      setItems(list.items);
-      setCategories(list.categories);
-      setSummary(stats.summary);
-      setError(null);
-    } catch (err) {
-      if (id === requestId.current) handleError(err);
-    } finally {
-      if (id === requestId.current) setLoading(false);
-    }
-  }, [debouncedQuery, category, status, handleError]);
+    return Promise.all([
+      hubApi.list({ q: debouncedQuery, category, status: status || undefined }),
+      hubApi.summary(),
+    ])
+      .then(
+        ([list, stats]) => {
+          if (id !== requestId.current) return;
+          setItems(list.items);
+          setCategories(list.categories);
+          setSummary(stats.summary);
+          setError(null);
+        },
+        (err) => {
+          if (id === requestId.current) handleError(err);
+        },
+      )
+      .finally(() => {
+        if (id === requestId.current) setLoadedKey(filterKey);
+      });
+  }, [debouncedQuery, category, status, filterKey, handleError]);
 
   useEffect(() => {
     hubApi.me().then(({ user }) => setUser(user), handleError);
@@ -146,6 +156,9 @@ export function InventoryDashboard() {
     router.refresh();
   }
 
+  // Until /me answers, assume read-only so write controls never flash for a viewer.
+  const canWrite = user !== null && user.role !== "viewer";
+
   const countFor = (s: LiquidationStatus) => summary?.by_status.find((b) => b.status === s)?.items ?? 0;
 
   return (
@@ -159,17 +172,32 @@ export function InventoryDashboard() {
             <h1 className="mt-1 text-3xl font-bold tracking-tight text-ink sm:text-4xl">Portfolio inventory</h1>
           </div>
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => void load()} aria-label="Refresh" disabled={loading}>
-              <RefreshCw className={cn("size-4", loading && "animate-spin")} aria-hidden />
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setRefreshing(true);
+                void load().finally(() => setRefreshing(false));
+              }}
+              aria-label="Refresh"
+              disabled={loading || refreshing}
+            >
+              <RefreshCw className={cn("size-4", (loading || refreshing) && "animate-spin")} aria-hidden />
             </Button>
-            <Button onClick={() => openDialog({ kind: "create" })}>
-              <Plus className="size-4" aria-hidden />
-              Stage item
-            </Button>
+            {canWrite && (
+              <Button onClick={() => openDialog({ kind: "create" })}>
+                <Plus className="size-4" aria-hidden />
+                Stage item
+              </Button>
+            )}
           </div>
         </div>
 
         {error && <Alert tone="error">{error}</Alert>}
+        {user?.role === "viewer" && (
+          <Alert tone="info">
+            Read-only {user.is_demo ? "demo " : ""}view. Sign in as a manager to stage, edit or delete items.
+          </Alert>
+        )}
 
         <MetricCards summary={summary} />
 
@@ -230,6 +258,7 @@ export function InventoryDashboard() {
           <InventoryGrid
             items={items}
             loading={loading && items.length === 0}
+            canWrite={canWrite}
             onEdit={(item) => openDialog({ kind: "edit", item })}
             onDelete={(item) => {
               setDeleteError(null);

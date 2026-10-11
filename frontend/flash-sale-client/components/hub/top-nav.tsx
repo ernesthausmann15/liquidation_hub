@@ -4,7 +4,7 @@ import { LogOut } from "lucide-react";
 import Link from "next/link";
 
 import type { HubUser } from "@/lib/hub-api";
-import { BrandMark, Button } from "./ui";
+import { Badge, BrandMark, Button } from "./ui";
 
 /** Layer 3: the nav is the one persistent liquid-glass surface; content scrolls beneath it. */
 export function TopNav({ user, onSignOut }: { user: HubUser | null; onSignOut: () => void }) {
@@ -28,6 +28,7 @@ export function TopNav({ user, onSignOut }: { user: HubUser | null; onSignOut: (
         </Link>
 
         <div className="ml-auto flex items-center gap-3">
+          {user?.is_demo && <Badge tone="brand">Demo</Badge>}
           {user && (
             <div className="hidden text-right leading-tight sm:block">
               <p className="text-sm font-medium text-ink">{user.display_name ?? user.email}</p>

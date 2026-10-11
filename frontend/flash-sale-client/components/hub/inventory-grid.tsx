@@ -14,11 +14,14 @@ const updatedFmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "nume
 export function InventoryGrid({
   items,
   loading,
+  canWrite,
   onEdit,
   onDelete,
 }: {
   items: InventoryItem[];
   loading: boolean;
+  /** Viewers get no edit/delete column; the API would 403 them anyway. */
+  canWrite: boolean;
   onEdit: (item: InventoryItem) => void;
   onDelete: (item: InventoryItem) => void;
 }) {
@@ -38,7 +41,9 @@ export function InventoryGrid({
               <th scope="col" className="px-4 py-3 text-right font-medium">Cost / unit</th>
               <th scope="col" className="px-4 py-3 text-right font-medium">Recovery value</th>
               <th scope="col" className="px-4 py-3 font-medium">Updated</th>
-              <th scope="col" className="px-4 py-3"><span className="sr-only">Actions</span></th>
+              {canWrite && (
+                <th scope="col" className="px-4 py-3"><span className="sr-only">Actions</span></th>
+              )}
             </tr>
           </thead>
           <tbody className={cn("transition-opacity", loading && "opacity-60")}>
@@ -83,26 +88,28 @@ export function InventoryGrid({
                   <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-ink-subtle">
                     <time dateTime={item.updated_at}>{updatedFmt.format(new Date(item.updated_at))}</time>
                   </td>
-                  <td className="px-2 py-2">
-                    <div className="flex justify-end gap-1">
-                      <button
-                        type="button"
-                        onClick={() => onEdit(item)}
-                        aria-label={`Edit ${item.name}`}
-                        className="grid size-8 place-items-center rounded-lg text-ink-muted transition-colors hover:bg-white/5 hover:text-brand"
-                      >
-                        <Pencil className="size-4" aria-hidden />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onDelete(item)}
-                        aria-label={`Delete ${item.name}`}
-                        className="grid size-8 place-items-center rounded-lg text-ink-muted transition-colors hover:bg-danger-tint hover:text-danger"
-                      >
-                        <Trash2 className="size-4" aria-hidden />
-                      </button>
-                    </div>
-                  </td>
+                  {canWrite && (
+                    <td className="px-2 py-2">
+                      <div className="flex justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => onEdit(item)}
+                          aria-label={`Edit ${item.name}`}
+                          className="grid size-8 place-items-center rounded-lg text-ink-muted transition-colors hover:bg-white/5 hover:text-brand"
+                        >
+                          <Pencil className="size-4" aria-hidden />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDelete(item)}
+                          aria-label={`Delete ${item.name}`}
+                          className="grid size-8 place-items-center rounded-lg text-ink-muted transition-colors hover:bg-danger-tint hover:text-danger"
+                        >
+                          <Trash2 className="size-4" aria-hidden />
+                        </button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               );
             })}

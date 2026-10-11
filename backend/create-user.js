@@ -10,8 +10,8 @@ const { Pool } = pkg;
 dotenv.config();
 
 const [email, displayName = null, role = "operator"] = process.argv.slice(2);
-if (!email || !["operator", "admin"].includes(role)) {
-  console.error('Usage: node create-user.js <email> ["Display Name"] [operator|admin]');
+if (!email || !["viewer", "operator", "admin"].includes(role)) {
+  console.error('Usage: node create-user.js <email> ["Display Name"] [viewer|operator|admin]');
   process.exit(1);
 }
 

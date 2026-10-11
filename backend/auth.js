@@ -85,7 +85,38 @@ const publicUser = (row) => ({
   email: row.email,
   display_name: row.display_name,
   role: row.role,
+  is_demo: row.is_demo,
 });
+
+/** Issues a session: random token to the browser (HttpOnly cookie), only its hash to the database. */
+export async function startSession(pool, res, userId, ttlMs = SESSION_TTL_MS) {
+  const token = randomBytes(32).toString("base64url");
+  await pool.query(
+    "INSERT INTO hub_sessions (token_hash, user_id, expires_at) VALUES ($1, $2, now() + $3 * interval '1 millisecond')",
+    [sha256(token), userId, ttlMs],
+  );
+  // Opportunistic cleanup keeps the table small without a cron job.
+  void pool.query("DELETE FROM hub_sessions WHERE expires_at < now()").catch(() => {});
+  res.setHeader("Set-Cookie", sessionCookie(token, ttlMs));
+}
+
+/** After requireAuth: blocks the read-only viewer role from anything that writes. */
+export function requireWriter(req, res, next) {
+  if (req.user.role === "viewer") {
+    return res
+      .status(403)
+      .json({ success: false, error: "This account is read-only. Sign in as a manager to make changes." });
+  }
+  next();
+}
+
+/** After requireAuth: real (non-demo) admins only, e.g. the portfolio analytics report. */
+export function requireOwnerAdmin(req, res, next) {
+  if (req.user.role !== "admin" || req.user.is_demo) {
+    return res.status(403).json({ success: false, error: "Admin access required." });
+  }
+  next();
+}
 
 /** Mounts /api/auth/* and returns requireAuth middleware for protected routes. */
 export function registerAuth(app, pool) {
@@ -104,7 +135,7 @@ export function registerAuth(app, pool) {
 
     try {
       const { rows } = await pool.query(
-        "SELECT * FROM hub_users WHERE lower(email) = $1 AND is_active",
+        "SELECT * FROM hub_users WHERE lower(email) = $1 AND is_active AND NOT is_demo",
         [email],
       );
       const user = rows[0];
@@ -115,15 +146,7 @@ export function registerAuth(app, pool) {
       }
       failures.delete(key);
 
-      const token = randomBytes(32).toString("base64url");
-      await pool.query(
-        "INSERT INTO hub_sessions (token_hash, user_id, expires_at) VALUES ($1, $2, now() + $3 * interval '1 millisecond')",
-        [sha256(token), user.user_id, SESSION_TTL_MS],
-      );
-      // Opportunistic cleanup keeps the table small without a cron job.
-      void pool.query("DELETE FROM hub_sessions WHERE expires_at < now()").catch(() => {});
-
-      res.setHeader("Set-Cookie", sessionCookie(token, SESSION_TTL_MS));
+      await startSession(pool, res, user.user_id);
       res.json({ success: true, user: publicUser(user) });
     } catch (err) {
       res.status(500).json({ success: false, error: err.message });

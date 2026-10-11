@@ -59,8 +59,12 @@ export type HubUser = {
   user_id: number;
   email: string;
   display_name: string | null;
-  role: "operator" | "admin";
+  /** viewer is read-only; the API answers 403 to its writes. */
+  role: "viewer" | "operator" | "admin";
+  is_demo: boolean;
 };
+
+export type DemoKind = "manager" | "consumer";
 
 export class ApiError extends Error {
   constructor(
@@ -102,6 +106,9 @@ export const hubApi = {
     }),
   logout: () => request<unknown>("/api/auth/logout", { method: "POST" }),
   me: () => request<{ user: HubUser }>("/api/auth/me"),
+  /** Starts a demo session; the server records the click in demo_clicks. */
+  demo: (kind: DemoKind) =>
+    request<{ user: HubUser }>("/api/auth/demo", { method: "POST", body: JSON.stringify({ kind }) }),
 
   list: (filters: { q?: string; category?: string; status?: LiquidationStatus }) => {
     const params = new URLSearchParams();

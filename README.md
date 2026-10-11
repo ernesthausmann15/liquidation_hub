@@ -68,7 +68,8 @@ Vrymnox tokens from `vrymnox-systems` plus a three-layer liquid-glass system (se
    BACKEND_URL=http://localhost:4000
    ```
    `next.config.ts` rewrites `/api/*` to Express, so the session cookie is first-party
-   (`HttpOnly`, `SameSite=Strict`, `Secure` in production).
+   (`HttpOnly`, `SameSite=Strict`, `Secure` in production). The rewrite target is fixed at
+   **`next build`** time, so set `BACKEND_URL` before building, not only before `next start`.
 
 | Endpoint | Purpose |
 | --- | --- |
@@ -76,3 +77,23 @@ Vrymnox tokens from `vrymnox-systems` plus a three-layer liquid-glass system (se
 | `GET /api/inventory?q=&category=&status=` | Filtered grid rows plus the category list |
 | `GET /api/inventory/summary` | Recovery value, book value, recovery rate, units by liquidation stage |
 | `POST /api/inventory`, `PATCH /api/inventory/:id`, `DELETE /api/inventory/:id?version=` | CRUD with optimistic concurrency: stale `version` returns `409` with the current row |
+
+### Portfolio demo mode
+
+Two one-click buttons on `/login`: **Demo Manager** (admin, full CRUD) and **Demo Viewer**
+(read-only; the API returns `403` to its writes). Off by default. Enable it in `backend/.env`:
+
+```env
+DEMO_MODE=true
+DEMO_ANALYTICS_SALT=any-long-random-string   # keeps unique-visitor counts stable across restarts
+```
+
+* `POST /api/auth/demo` `{ "kind": "manager" | "consumer" }` signs the visitor into a dedicated demo
+  account (2-hour session, max 20 per IP per hour) and logs the click in `demo_clicks`. Visitor IPs
+  are stored only as a salted SHA-256 hash. Demo accounts cannot sign in with a password.
+* Engagement report (non-demo admins only): `GET /api/analytics/demo-clicks`, or in pgAdmin:
+  ```sql
+  SELECT * FROM demo_click_daily ORDER BY day DESC;          -- clicks and unique visitors per day
+  SELECT action_type, count(*) FROM demo_clicks GROUP BY 1;  -- all-time totals
+  ```
+* Demo managers can change and delete real rows, so back up the portfolio data you show.

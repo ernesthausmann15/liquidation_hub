@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { DemoButtons } from "@/components/hub/demo-buttons";
 import { LoginForm } from "@/components/hub/login-form";
 import { BrandMark } from "@/components/hub/ui";
 
@@ -12,8 +13,21 @@ function safeNext(value: string | string[] | undefined) {
     : "/inventory";
 }
 
+/** Asks Express whether DEMO_MODE is on, so the buttons only render when they will work. */
+async function demoEnabled() {
+  try {
+    const res = await fetch(`${process.env.BACKEND_URL ?? "http://localhost:4000"}/api/auth/demo`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(3000),
+    });
+    return res.ok && (await res.json()).enabled === true;
+  } catch {
+    return false;
+  }
+}
+
 export default async function LoginPage(props: PageProps<"/login">) {
-  const { next } = await props.searchParams;
+  const [{ next }, showDemo] = await Promise.all([props.searchParams, demoEnabled()]);
 
   return (
     <main className="ambient-canvas relative grid min-h-dvh place-items-center overflow-hidden px-4 py-12">
@@ -39,6 +53,7 @@ export default async function LoginPage(props: PageProps<"/login">) {
             Access is limited to provisioned Vrymnox operators.
           </p>
           <LoginForm next={safeNext(next)} />
+          {showDemo && <DemoButtons next={safeNext(next)} />}
         </section>
 
         <p className="mt-6 text-center font-mono text-[11px] uppercase tracking-[0.14em] text-ink-subtle">

@@ -96,3 +96,32 @@ CREATE TABLE IF NOT EXISTS hub_sessions (
   expires_at TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX IF NOT EXISTS hub_sessions_expires_idx ON hub_sessions (expires_at);
+
+-- ------------------------------------------------------------------ portfolio demo mode
+-- 'viewer' is read-only: the API rejects inventory writes from it (inventory.js requireWriter).
+ALTER TABLE hub_users DROP CONSTRAINT IF EXISTS hub_users_role_check;
+ALTER TABLE hub_users ADD CONSTRAINT hub_users_role_check CHECK (role IN ('viewer', 'operator', 'admin'));
+-- Demo accounts are created by POST /api/auth/demo and can never sign in with a password.
+ALTER TABLE hub_users ADD COLUMN IF NOT EXISTS is_demo BOOLEAN NOT NULL DEFAULT false;
+
+-- One row per demo-button click that produced a session. The visitor's IP is never stored:
+-- visitor_hash is SHA-256(DEMO_ANALYTICS_SALT || ip), enough to count unique visitors.
+CREATE TABLE IF NOT EXISTS demo_clicks (
+  click_id BIGSERIAL PRIMARY KEY,
+  action_type VARCHAR(20) NOT NULL CHECK (action_type IN ('manager_demo', 'consumer_demo')),
+  clicked_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  visitor_hash CHAR(64),
+  user_agent VARCHAR(512),
+  referrer VARCHAR(512),
+  accept_language VARCHAR(64)
+);
+CREATE INDEX IF NOT EXISTS demo_clicks_clicked_at_idx ON demo_clicks (clicked_at);
+
+-- Reporting: SELECT * FROM demo_click_daily ORDER BY day DESC; (also GET /api/analytics/demo-clicks)
+CREATE OR REPLACE VIEW demo_click_daily AS
+SELECT date_trunc('day', clicked_at)::date AS day,
+       action_type,
+       count(*)::int AS clicks,
+       count(DISTINCT visitor_hash)::int AS unique_visitors
+  FROM demo_clicks
+ GROUP BY 1, 2;

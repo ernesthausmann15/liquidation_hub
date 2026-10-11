@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { requireWriter } from "./auth.js";
+
 export const LIQUIDATION_STATUSES = ["staged", "listed", "reserved", "liquidated", "written_off"];
 
 // NUMERIC(10,2) fits a float8 exactly enough for display, so the API returns numbers
@@ -161,7 +163,7 @@ export function registerInventory(app, pool, requireAuth) {
     }
   });
 
-  app.post("/api/inventory", requireAuth, async (req, res) => {
+  app.post("/api/inventory", requireAuth, requireWriter, async (req, res) => {
     const parsed = ItemSchema.safeParse(req.body ?? {});
     if (!parsed.success) return zodError(res, parsed.error);
     const item = parsed.data;
@@ -195,7 +197,7 @@ export function registerInventory(app, pool, requireAuth) {
    * client read. Zero rows means someone else saved first (409, with their row so the grid
    * can refresh) or the item is gone (404).
    */
-  app.patch("/api/inventory/:id", requireAuth, async (req, res) => {
+  app.patch("/api/inventory/:id", requireAuth, requireWriter, async (req, res) => {
     const id = parseId(req.params.id);
     if (!id) return res.status(400).json({ success: false, error: "Invalid item id" });
 
@@ -235,7 +237,7 @@ export function registerInventory(app, pool, requireAuth) {
     }
   });
 
-  app.delete("/api/inventory/:id", requireAuth, async (req, res) => {
+  app.delete("/api/inventory/:id", requireAuth, requireWriter, async (req, res) => {
     const id = parseId(req.params.id);
     const version = parseId(req.query.version);
     if (!id || !version) {

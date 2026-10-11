@@ -9,6 +9,7 @@ import { z } from "zod";
 import { readFile } from "node:fs/promises";
 import { registerAuth } from "./auth.js";
 import { registerInventory } from "./inventory.js";
+import { registerDemo } from "./demo.js";
 
 dotenv.config();
 
@@ -38,6 +39,7 @@ async function initDb() {
 
 const requireAuth = registerAuth(app, pool);
 registerInventory(app, pool, requireAuth);
+registerDemo(app, pool, requireAuth);
 
 app.get("/api/test-db", async (req, res) => {
   try {
@@ -89,72 +91,93 @@ app.post("/api/products", async (req, res) => {
   }
 });
 
-app.post("/api/purchases", async (req, res) => {
-  const { productId, quantity } = req.body;
+const PurchaseSchema = z.object({
+  productId: z.number().int().positive(),
+  quantity: z.number().int().positive().max(1000),
+  customerEmail: z.string().trim().toLowerCase().email().max(255),
+});
 
-  if (!productId || !Number.isInteger(productId) || productId <= 0) {
+/**
+ * Buys units of a product at its active flash-sale price.
+ * Request:  { productId, quantity, customerEmail }
+ * Locks the flash sale, then the product (always in that order), so concurrent buyers
+ * queue on the row locks and neither stock nor stock_limit can be oversold.
+ */
+app.post("/api/purchases", async (req, res) => {
+  const parsed = PurchaseSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
     return res
       .status(400)
-      .json({ success: false, error: "Product ID is required" });
+      .json({ success: false, error: `${issue.path.join(".")}: ${issue.message}` });
   }
-  if (!quantity || !Number.isInteger(quantity) || quantity <= 0) {
-    return res
-      .status(400)
-      .json({ success: false, error: "Quantity must be a positive integer" });
-  }
+  const { productId, quantity, customerEmail } = parsed.data;
 
   const client = await pool.connect();
-
   try {
     await client.query("BEGIN");
 
-    const productQuery = `SELECT stock, base_price FROM products WHERE product_id = $1 FOR UPDATE`;
-    const productResult = await client.query(productQuery, [productId]);
-
-    if (productResult.rows.length === 0) {
+    // start_time / end_time are TIMESTAMP without time zone, so compare with LOCALTIMESTAMP.
+    const saleResult = await client.query(
+      `SELECT flash_sale_id, stock_limit, sold_count
+         FROM flash_sales
+        WHERE product_id = $1 AND status = 'active'
+          AND LOCALTIMESTAMP BETWEEN start_time AND end_time
+        ORDER BY end_time
+        LIMIT 1
+        FOR UPDATE`,
+      [productId],
+    );
+    const sale = saleResult.rows[0];
+    if (!sale) {
       await client.query("ROLLBACK");
       return res
         .status(404)
-        .json({ success: false, error: "Product not found" });
+        .json({ success: false, error: "No active flash sale for this product" });
     }
 
+    const productResult = await client.query(
+      "SELECT stock FROM products WHERE product_id = $1 FOR UPDATE",
+      [productId],
+    );
     const product = productResult.rows[0];
+    if (!product) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ success: false, error: "Product not found" });
+    }
 
-    if (product.stock < quantity) {
+    const saleRemaining = sale.stock_limit - sale.sold_count;
+    const available = Math.min(product.stock, saleRemaining);
+    if (available < quantity) {
       await client.query("ROLLBACK");
       return res.status(400).json({
         success: false,
-        error: `Out of stock! Only ${product.stock} items remaining`,
+        error: `Out of stock! Only ${Math.max(available, 0)} items remaining`,
       });
     }
 
-    const newStock = product.stock - quantity;
-    // NUMERIC arrives from node-pg as a string. Multiply the number so the
-    // order row stores 120.00, not a concatenation.
-    const totalPrice = Number(product.price) * quantity;
+    // Bump version too, so a Liquidation Hub edit made from an older read gets a 409
+    // instead of silently restoring the stock this sale just took.
+    const updateResult = await client.query(
+      `UPDATE products
+          SET stock = stock - $2, version = version + 1, updated_at = now()
+        WHERE product_id = $1
+        RETURNING stock`,
+      [productId, quantity],
+    );
+    await client.query(
+      "UPDATE flash_sales SET sold_count = sold_count + $2 WHERE flash_sale_id = $1",
+      [sale.flash_sale_id, quantity],
+    );
 
-    const updateStockQuery = `UPDATE products SET stock = $1 WHERE product_id = $2 RETURNING stock`;
-    const updateResult = await client.query(updateStockQuery, [
-      newStock,
-      productId,
-    ]);
-
-    const flashSaleQuery = `SELECT discount_price FROM flash_sales WHERE flash_sale_id = $1 FOR UPDATE`;
-    const flashSaleResult = await client.query(flashSaleQuery, [productId]);
-    if (flashSaleResult.rows.length === 0) {
-      await client.query("ROLLBACK");
-      return res.status(404).json({ success: false, error: "Flash sale not found" });
-    }
-    const flashSale = flashSaleResult.rows[0];
-    const totalPaid = flashSale.discount_price * quantity;
-    const customerEmail = req.body.customerEmail;
-    const orderQuery = `INSERT INTO orders (flash_sale_id, customer_email, quantity, total_paid) VALUES ($1, $2, $3, $4) RETURNING *`;
-    const orderResult = await client.query(orderQuery, [
-      flashSale.flash_sale_id,
-      customerEmail,
-      quantity,
-      totalPaid,
-    ]);
+    // total_paid is computed in NUMERIC by Postgres, never in JavaScript floats.
+    const orderResult = await client.query(
+      `INSERT INTO orders (flash_sale_id, customer_email, quantity, total_paid)
+       SELECT flash_sale_id, $2, $3::int, discount_price * $3::int
+         FROM flash_sales WHERE flash_sale_id = $1
+       RETURNING *`,
+      [sale.flash_sale_id, customerEmail, quantity],
+    );
 
     await client.query("COMMIT");
 
