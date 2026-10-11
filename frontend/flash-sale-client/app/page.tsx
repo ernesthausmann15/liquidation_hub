@@ -3,6 +3,9 @@ import Link from "next/link";
 
 import { BrandMark } from "@/components/hub/ui";
 import { CATEGORIES } from "@/components/storefront/categories";
+import { ActivityToasts } from "@/components/storefront/live/activity-toasts";
+import { LiveDealsGrid } from "@/components/storefront/live/live-deals-grid";
+import { LiveTicker } from "@/components/storefront/live/live-ticker";
 import { VipSignupForm } from "@/components/storefront/vip-signup-form";
 import { backendUrl } from "@/lib/backend-url";
 
@@ -34,6 +37,22 @@ async function loadDeals(): Promise<Deal[] | null> {
   }
 }
 
+/**
+ * The simulated live stream only runs when the API is in DEMO_MODE (the portfolio deployment), so
+ * a real storefront never shows invented orders, stock levels or viewer counts to shoppers.
+ */
+async function demoEnabled() {
+  try {
+    const res = await fetch(`${backendUrl()}/api/auth/demo`, {
+      next: { revalidate: 60 },
+      signal: AbortSignal.timeout(3000),
+    });
+    return res.ok && (await res.json()).enabled === true;
+  } catch {
+    return false;
+  }
+}
+
 const PERKS = [
   { icon: BadgePercent, title: "Up to 70% off retail", text: "Priced below wholesale on overstock and returns." },
   { icon: PackageCheck, title: "Verified lots", text: "Every listing is inspected and graded before it goes live." },
@@ -41,7 +60,7 @@ const PERKS = [
 ];
 
 export default async function StorefrontPage() {
-  const deals = await loadDeals();
+  const [deals, demo] = await Promise.all([loadDeals(), demoEnabled()]);
 
   return (
     <div className="ambient-canvas flex min-h-dvh flex-col">
@@ -68,6 +87,7 @@ export default async function StorefrontPage() {
             </a>
           </div>
         </nav>
+        {demo && <LiveTicker />}
       </header>
 
       <main className="flex-1">
@@ -144,10 +164,20 @@ export default async function StorefrontPage() {
             <h2 id="deals-title" className="text-3xl font-bold text-ink">
               Live liquidation deals
             </h2>
-            <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-subtle">Updated every minute</p>
+            {!demo && (
+              <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-subtle">Updated every minute</p>
+            )}
           </div>
 
-          {deals && deals.length > 0 ? (
+          {demo ? (
+            <>
+              <p className="mt-3 text-sm text-ink-subtle">
+                Demo mode: orders, stock levels and viewer counts in this section are simulated in your browser and
+                reset every hour.
+              </p>
+              <LiveDealsGrid />
+            </>
+          ) : deals && deals.length > 0 ? (
             <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {deals.map((deal) => (
                 <li key={deal.product_id} className="surface-data flex flex-col rounded-2xl p-5">
@@ -210,6 +240,7 @@ export default async function StorefrontPage() {
           </Link>
         </div>
       </footer>
+      {demo && <ActivityToasts />}
     </div>
   );
 }

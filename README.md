@@ -105,6 +105,13 @@ DEMO_ANALYTICS_SALT=any-long-random-string   # keeps unique-visitor counts stabl
   and edited rows are never touched or duplicated. `SHOWCASE_AUTOHEAL=false` turns it off. Outside demo
   mode it never runs, so real inventory is never seeded.
 
+* **Live marketplace stream:** in demo mode the storefront's deals section is replaced by a simulated
+  marketplace (`frontend/flash-sale-client/lib/live-stream/`): 41 seed items, a fake order every 4-12 s,
+  draining stock, sell-outs, viewer counts, purchase toasts and a ticker under the nav. It runs only in
+  the visitor's tab (state in `sessionStorage`, nothing sent to the API) and is labelled as simulated.
+  It resets after 60 minutes, when everything sells out, or via **Reset demo data**; in development
+  `window.resetSimulatorState()` does the same. Outside demo mode the real catalog is shown instead.
+
 ### Deploying to Render
 
 `render.yaml` defines the Postgres database (`liquidation-hub-db`), the API (`liquidation-hub-api`) and
