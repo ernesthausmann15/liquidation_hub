@@ -10,6 +10,11 @@ import { backendUrl } from "./lib/backend-url";
 const BACKEND_URL = backendUrl();
 
 const nextConfig: NextConfig = {
+  // The hub is the showcase, so the site root opens the sign-in screen. Temporary (307), not
+  // permanent, so browsers do not cache it if / gets its own page later.
+  async redirects() {
+    return [{ source: "/", destination: "/login", permanent: false }];
+  },
   async rewrites() {
     return [{ source: "/api/:path*", destination: `${BACKEND_URL}/api/:path*` }];
   },
