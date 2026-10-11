@@ -1,13 +1,11 @@
 # Render Blueprint: Liquidation Hub.
-# Resource names below predate the rebrand. Renaming them makes Render provision new services and a
-# new, empty database, so change them only for a fresh deployment.
 # Render dashboard → New → Blueprint → pick this repo. Values marked `sync: false` are asked for
 # on first deploy and never stored in git.
 
 databases:
-  - name: vrymnox-hub-db
-    databaseName: staged_vrymnox
-    user: vrymnox
+  - name: liquidation-hub-db
+    databaseName: liquidation_hub
+    user: liquidation_hub
     # Free Render Postgres expires after 30 days; switch to a paid plan for a long-lived portfolio.
     plan: free
 
@@ -15,7 +13,7 @@ services:
   # Express API. Applies backend/db/schema.sql on every boot (idempotent), then seeds the
   # showcase inventory when DEMO_MODE=true.
   - type: web
-    name: vrymnox-hub-api
+    name: liquidation-hub-api
     runtime: node
     rootDir: backend
     plan: free
@@ -29,7 +27,7 @@ services:
         value: production # Secure session cookie
       - key: DATABASE_URL
         fromDatabase:
-          name: vrymnox-hub-db
+          name: liquidation-hub-db
           property: connectionString
       - key: DEMO_MODE
         value: "true"
@@ -42,7 +40,7 @@ services:
 
   # Next.js frontend. All browser API calls go to /api/* here and are rewritten to the API.
   - type: web
-    name: vrymnox-hub-web
+    name: liquidation-hub
     runtime: node
     rootDir: frontend/flash-sale-client
     plan: free
@@ -54,6 +52,6 @@ services:
       - key: NODE_VERSION
         value: "22"
       - key: BACKEND_URL
-        # The API's public URL, e.g. https://vrymnox-hub-api.onrender.com. Read at build time,
+        # The API's public URL, e.g. https://liquidation-hub-api.onrender.com. Read at build time,
         # so redeploy this service after changing it.
         sync: false

@@ -107,17 +107,16 @@ DEMO_ANALYTICS_SALT=any-long-random-string   # keeps unique-visitor counts stabl
 
 ### Deploying to Render
 
-`render.yaml` defines the Postgres database, the API and the Next.js frontend. The Render resource
-names (`vrymnox-hub-db`, `vrymnox-hub-api`, `vrymnox-hub-web`) are kept from the original deployment:
-renaming them in the blueprint makes Render create new services and an empty new database.
+`render.yaml` defines the Postgres database (`liquidation-hub-db`), the API (`liquidation-hub-api`) and
+the Next.js frontend (`liquidation-hub`).
 
 1. **Create the stack:** Render dashboard → New → Blueprint → select this repo. When prompted, set
    `OPENAI_API_KEY` (only the owner-only `/api/add-product` uses it) and set `BACKEND_URL` to the API's
-   public URL, e.g. `https://vrymnox-hub-api.onrender.com`.
+   public URL, e.g. `https://liquidation-hub-api.onrender.com`.
 2. **First boot** applies `backend/db/schema.sql` and seeds the showcase inventory automatically.
-   Check `https://vrymnox-hub-api.onrender.com/health` returns `{"status":"ok"}`.
+   Check `https://liquidation-hub-api.onrender.com/health` returns `{"status":"ok"}`.
 3. **Create your owner account** from your machine, using the database's *External Database URL*
-   (Render dashboard → vrymnox-hub-db → Connect):
+   (Render dashboard → liquidation-hub-db → Connect):
    ```bash
    cd backend
    DATABASE_URL="<External Database URL>?sslmode=require" node create-user.js you@example.com "Your Name" admin
@@ -131,7 +130,7 @@ renaming them in the blueprint makes Render create new services and an empty new
 | Variable (API) | Set by | Notes |
 | --- | --- | --- |
 | `NODE_ENV=production` | blueprint | Marks the session cookie `Secure`; the server warns on Render if unset |
-| `DATABASE_URL` | blueprint | Internal connection string of `vrymnox-hub-db` |
+| `DATABASE_URL` | blueprint | Internal connection string of `liquidation-hub-db` |
 | `DEMO_MODE=true` | blueprint | Demo buttons, showcase auto-heal |
 | `DEMO_ANALYTICS_SALT` | blueprint (generated once) | Never change it, or unique-visitor counts restart |
 | `TRUST_PROXY` | you, after step 4 | Defaults to `1` on Render, `loopback` locally |
