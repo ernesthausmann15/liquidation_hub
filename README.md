@@ -1,6 +1,8 @@
-# Flash Sale & AI Inventory Management Platform
+# Liquidation Hub
 
-A production-ready, full-stack application featuring a modern client-server architecture, real-time data synchronization, and integrated modular AI capabilities for dynamic database analysis.
+A standalone e-commerce marketplace for overstock, open-box electronics and wholesale liquidation
+lots. Shoppers browse live deals and join the VIP Deals Club on the storefront (`/`); operators
+manage the inventory behind it in the operator console (`/login` → `/inventory`).
 
 ---
 
@@ -50,18 +52,20 @@ NEXT_PUBLIC_API_URL=http://localhost:4000
 
 ---
 
-## 🧊 Staged Portfolio Liquidation Hub
+## 🧊 Storefront and operator console
 
-Operator login (`/login`) and the PostgreSQL inventory dashboard (`/inventory`), styled with the
-Vrymnox tokens from `vrymnox-systems` plus a three-layer liquid-glass system (see the header of
+The public storefront (`/`) lists live deals from `GET /api/products` and collects VIP Deals Club
+signups through `POST /api/vip-signup` (stored in `vip_signups`, 10 per IP per hour). Operator login
+(`/login`) and the PostgreSQL inventory dashboard (`/inventory`) sit behind it. Everything shares one
+dark palette plus a three-layer liquid-glass system (see the header of
 `frontend/flash-sale-client/app/globals.css`).
 
 1. **Schema.** `backend/db/schema.sql` is idempotent. The API applies it on boot, and you can also
    run it from pgAdmin (Query Tool → open file → Execute). It adds the liquidation columns to
-   `products` (existing rows keep their data) and creates `hub_users` / `hub_sessions`.
+   `products` (existing rows keep their data) and creates `hub_users` / `hub_sessions` / `vip_signups`.
 2. **Create an operator** (password is prompted, never passed on the command line):
    ```bash
-   cd backend && node create-user.js ops@vrymnox.com "Ops Lead" admin
+   cd backend && node create-user.js ops@liquidationhub.com "Ops Lead" admin
    ```
 3. **Point Next.js at the API** in `frontend/flash-sale-client/.env.local` (server-side only):
    ```env
@@ -103,7 +107,9 @@ DEMO_ANALYTICS_SALT=any-long-random-string   # keeps unique-visitor counts stabl
 
 ### Deploying to Render
 
-`render.yaml` defines the Postgres database (`staged_vrymnox`), the API and the Next.js frontend.
+`render.yaml` defines the Postgres database, the API and the Next.js frontend. The Render resource
+names (`vrymnox-hub-db`, `vrymnox-hub-api`, `vrymnox-hub-web`) are kept from the original deployment:
+renaming them in the blueprint makes Render create new services and an empty new database.
 
 1. **Create the stack:** Render dashboard → New → Blueprint → select this repo. When prompted, set
    `OPENAI_API_KEY` (only the owner-only `/api/add-product` uses it) and set `BACKEND_URL` to the API's
@@ -114,7 +120,7 @@ DEMO_ANALYTICS_SALT=any-long-random-string   # keeps unique-visitor counts stabl
    (Render dashboard → vrymnox-hub-db → Connect):
    ```bash
    cd backend
-   DATABASE_URL="<External Database URL>?sslmode=require" node create-user.js you@vrymnox.com "Your Name" admin
+   DATABASE_URL="<External Database URL>?sslmode=require" node create-user.js you@example.com "Your Name" admin
    ```
 4. **Calibrate `TRUST_PROXY`:** sign in on the frontend as the owner, open `/api/admin/request-info`.
    If `ip` is not your own public address, add `TRUST_PROXY` on the API service (try `2`, then `3`)
@@ -136,4 +142,5 @@ changing it. The free plans sleep after inactivity; the first request after a sl
 
 Owner-only routes (never demo accounts): `POST /api/add-product`, `DELETE /api/orders/:id`,
 `GET /api/analytics/demo-clicks`, `GET /api/admin/request-info`. Public routes: `GET /api/products`
-(listed and reserved items, no cost data), `POST /api/purchases` (30 per IP per 10 minutes), `/health`.
+(listed and reserved items, no cost data), `POST /api/purchases` (30 per IP per 10 minutes),
+`POST /api/vip-signup` (10 per IP per hour), `/health`.

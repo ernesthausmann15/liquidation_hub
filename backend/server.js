@@ -228,6 +228,43 @@ app.post("/api/purchases", async (req, res) => {
   }
 });
 
+const VIP_CATEGORIES = ["Electronics", "Home Goods", "Bulk Pallets", "Apparel"];
+
+const VipSignupSchema = z.object({
+  email: z.string().trim().toLowerCase().email().max(255),
+  interests: z.array(z.enum(VIP_CATEGORIES)).max(VIP_CATEGORIES.length).default([]),
+});
+
+// Public storefront route: throttled per IP so a script cannot fill the table.
+const vipLimit = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 10 });
+
+/**
+ * VIP Deals Club signup. Request: { email, interests? }. Re-joining with the same address
+ * updates the interests and still answers 200, so the form never reveals who is already a member.
+ */
+app.post("/api/vip-signup", async (req, res) => {
+  if (vipLimit(req.ip)) {
+    return res.status(429).json({ success: false, error: "Too many signups from this network. Try again later." });
+  }
+  const parsed = VipSignupSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    const field = parsed.error.issues[0].path[0];
+    const error = field === "email" ? "Enter a valid email address." : "Pick categories from the list.";
+    return res.status(400).json({ success: false, error });
+  }
+  const { email, interests } = parsed.data;
+  try {
+    await pool.query(
+      `INSERT INTO vip_signups (email, interests) VALUES ($1, $2)
+       ON CONFLICT (lower(email)) DO UPDATE SET interests = EXCLUDED.interests`,
+      [email, interests],
+    );
+    res.json({ success: true, message: "You're in. Watch your inbox for the next drop." });
+  } catch (err) {
+    serverError(res, err, `${req.method} ${req.path}`);
+  }
+});
+
 app.get("/api/orders", requireAuth, async (req, res) => {
   try {
     const query = `SELECT o.order_id, o.quantity, o.total_paid, o.created_at AS order_date, f.flash_sale_id, f.discount_price, f.stock_limit, f.sold_count, f.status, f.start_time, f.end_time FROM orders o JOIN flash_sales f ON o.flash_sale_id = f.flash_sale_id ORDER BY o.created_at DESC`;
@@ -367,11 +404,12 @@ app.post("/api/add-product", requireAuth, requireOwnerAdmin, async (req, res) =>
 // route Express has nothing to send and replies with its default "Cannot GET /".
 app.get("/", (req, res) => {
   res.json({
-    message: "Flash sale API is running",
+    message: "Liquidation Hub API is running",
     endpoints: {
       products: "/api/products",
       addProduct: "/api/add-product",
       purchases: "/api/purchases",
+      vipSignup: "/api/vip-signup",
       orders: "/api/orders",
       stats: "/api/stats",
     },

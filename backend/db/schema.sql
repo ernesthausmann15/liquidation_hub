@@ -1,4 +1,4 @@
--- Vrymnox Staged Portfolio Liquidation Hub: PostgreSQL schema.
+-- Liquidation Hub: PostgreSQL schema.
 --
 -- Idempotent: server.js runs this file on boot, and it can be pasted into the pgAdmin
 -- Query Tool as-is. Existing product rows keep their data; the liquidation columns are
@@ -125,3 +125,13 @@ SELECT date_trunc('day', clicked_at)::date AS day,
        count(DISTINCT visitor_hash)::int AS unique_visitors
   FROM demo_clicks
  GROUP BY 1, 2;
+
+-- ------------------------------------------------------------------ VIP deals club
+-- Storefront email signups (POST /api/vip-signup). One row per address; re-joining is a no-op.
+CREATE TABLE IF NOT EXISTS vip_signups (
+  signup_id SERIAL PRIMARY KEY,
+  email VARCHAR(255) NOT NULL,
+  interests TEXT[] NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS vip_signups_email_key ON vip_signups (lower(email));

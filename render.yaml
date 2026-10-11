@@ -1,4 +1,6 @@
-# Render Blueprint: Vrymnox Staged Portfolio Liquidation Hub.
+# Render Blueprint: Liquidation Hub.
+# Resource names below predate the rebrand. Renaming them makes Render provision new services and a
+# new, empty database, so change them only for a fresh deployment.
 # Render dashboard → New → Blueprint → pick this repo. Values marked `sync: false` are asked for
 # on first deploy and never stored in git.
 

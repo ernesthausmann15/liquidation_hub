@@ -18,13 +18,13 @@ const DEMO_SESSION_TTL_MS = 2 * 60 * 60 * 1000;
 const DEMO_ACCOUNTS = {
   manager: {
     action: "manager_demo",
-    email: "demo-manager@vrymnox.demo",
+    email: "demo-manager@liquidationhub.demo",
     display_name: "Demo Manager",
     role: "admin",
   },
   consumer: {
     action: "consumer_demo",
-    email: "demo-viewer@vrymnox.demo",
+    email: "demo-viewer@liquidationhub.demo",
     display_name: "Demo Viewer",
     role: "viewer",
   },

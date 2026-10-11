@@ -15,9 +15,17 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: { default: "Vrymnox Liquidation Hub", template: "%s · Vrymnox Liquidation Hub" },
-  description: "Staged portfolio liquidation: inventory, valuation and recovery tracking.",
-  robots: { index: false, follow: false }, // internal operator workspace
+  title: { default: "Liquidation Hub", template: "%s · Liquidation Hub" },
+  description:
+    "Source verified overstock, open-box electronics, and wholesale liquidation lots at up to 70% off retail prices.",
+  applicationName: "Liquidation Hub",
+  openGraph: {
+    siteName: "Liquidation Hub",
+    title: "Liquidation Hub: Exclusive Deals on Overstock & Liquidation Inventory",
+    description:
+      "Source verified overstock, open-box electronics, and wholesale liquidation lots at up to 70% off retail prices.",
+    type: "website",
+  },
 };
 
 export const viewport: Viewport = { themeColor: "#0c0e11", colorScheme: "dark" };

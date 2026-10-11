@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { DemoButtons } from "@/components/hub/demo-buttons";
 import { LoginForm } from "@/components/hub/login-form";
 import { BrandMark } from "@/components/hub/ui";
 import { backendUrl } from "@/lib/backend-url";
 
-export const metadata: Metadata = { title: "Sign in" };
+export const metadata: Metadata = { title: "Sign in", robots: { index: false, follow: false } };
 
 /** Only same-site paths are honoured, so ?next= cannot become an open redirect. */
 function safeNext(value: string | string[] | undefined) {
@@ -40,9 +41,11 @@ export default async function LoginPage(props: PageProps<"/login">) {
 
       <div className="relative w-full max-w-[26rem] animate-glass-in">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
-          <BrandMark />
+          <Link href="/" aria-label="Liquidation Hub storefront">
+            <BrandMark />
+          </Link>
           <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-ink-muted">
-            Staged Portfolio Liquidation Hub
+            Operator Console
           </p>
         </div>
 
@@ -51,7 +54,7 @@ export default async function LoginPage(props: PageProps<"/login">) {
             Operator sign-in
           </h1>
           <p className="mt-1.5 text-sm text-ink-muted">
-            Access is limited to provisioned Vrymnox operators.
+            Access is limited to provisioned Liquidation Hub operators.
           </p>
           <LoginForm next={safeNext(next)} />
           {showDemo && <DemoButtons next={safeNext(next)} />}

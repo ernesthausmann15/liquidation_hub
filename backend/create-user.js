@@ -1,5 +1,5 @@
 // Creates or resets a Liquidation Hub operator.
-//   node create-user.js ops@vrymnox.com "Ops Lead" admin
+//   node create-user.js ops@liquidationhub.com "Ops Lead" admin
 // The password is read from HUB_PASSWORD or prompted for (not echoed), so it never lands in shell history.
 import pkg from "pg";
 import dotenv from "dotenv";

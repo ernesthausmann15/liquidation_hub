@@ -1,10 +1,8 @@
 /**
- * Hub primitives, ported from vrymnox-systems/frontend/ui/components/ui.tsx so buttons, fields
- * and badges look the same across Vrymnox products. Glass is opt-in through `glass` props:
- * the default is the flat base-data layer.
+ * Hub primitives shared by the storefront and the operator console. Glass is opt-in through
+ * `glass` props: the default is the flat base-data layer.
  */
 import { AlertTriangle, CheckCircle2, Info, Loader2 } from "lucide-react";
-import Image from "next/image";
 import type { ComponentProps, ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
@@ -168,12 +166,29 @@ export function Alert({ tone = "info", children }: { tone?: keyof typeof alertTo
   );
 }
 
-/** Vrymnox mark (public/vrymnox-logo.png, from vrymnox-systems) plus the Space Grotesk logotype. */
+/** Liquidation Hub mark: a price tag cut by a downward markdown arrow, plus the Space Grotesk logotype. */
+export function LogoMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 32 32" aria-hidden className={cn("size-7", className)}>
+      <rect width="32" height="32" rx="8" className="fill-brand" />
+      <path
+        d="M9 8.5h8.2l6.3 6.3a1.6 1.6 0 0 1 0 2.3l-6.4 6.4a1.6 1.6 0 0 1-2.3 0L8.5 17.2V9a.5.5 0 0 1 .5-.5Z"
+        className="fill-none stroke-on-brand"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <circle cx="12.5" cy="12.5" r="1.6" className="fill-on-brand" />
+    </svg>
+  );
+}
+
 export function BrandMark({ className }: { className?: string }) {
   return (
     <span className={cn("inline-flex items-center gap-2.5", className)}>
-      <Image src="/vrymnox-logo.png" alt="" width={28} height={28} className="rounded-md" priority />
-      <span className="font-display text-lg font-bold tracking-[0.18em] text-ink">VRYMNOX</span>
+      <LogoMark />
+      <span className="font-display text-lg font-bold tracking-[0.14em] whitespace-nowrap text-ink">
+        LIQUIDATION <span className="text-brand">HUB</span>
+      </span>
     </span>
   );
 }

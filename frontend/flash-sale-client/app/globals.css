@@ -3,15 +3,13 @@
 @import "shadcn/tailwind.css";
 
 /*
- * Vrymnox Staged Portfolio Liquidation Hub: design tokens.
+ * Liquidation Hub: design tokens.
  *
- * Palette, type and geometry are lifted from vrymnox-systems:
- *   frontend/ui/stitch_liquidation_hub_pro/.../industrial_high_contrast_commerce/DESIGN.md
- *   frontend/ui/app/globals.css     (obsidian / charcoal / electric amber, cyan signal)
- *   obsidian_vrymnox_agency_prompts/architecture/vrymnox-frontend_rounding_directive.md
- *                                   (rounded-2xl containers, rounded-xl controls, rounded-lg badges)
+ * Industrial high-contrast commerce palette: obsidian / charcoal surfaces, electric amber for
+ * actions, cyan for low-stock signals. Geometry: rounded-2xl containers, rounded-xl controls,
+ * rounded-lg badges.
  *
- * vrymnox-systems itself is flat (ghost borders, no blur, no shadows). The glass layers below
+ * The base palette is flat (ghost borders, no blur, no shadows). The glass layers below
  * are new to this hub and follow the Rule of Three Layers, so the flat look survives where data lives:
  *   1. Base data   .surface-data   solid #111415 / #1a1d24, no transparency: tables, logs, inputs.
  *   2. Raised      .glass-raised   light translucency + 1px refractive gradient edge: metric cards, panels.
@@ -24,7 +22,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* ---------------------------------------------------------------- Vrymnox tokens */
+/* ---------------------------------------------------------------- tokens */
 @theme inline {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-space-grotesk), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
@@ -108,7 +106,7 @@
   }
 }
 
-/* The hub is dark-only; shadcn variables map onto the Vrymnox palette. */
+/* The hub is dark-only; shadcn variables map onto the hub palette. */
 :root,
 .dark {
   color-scheme: dark;
@@ -266,7 +264,7 @@
 }
 
 /* Glass needs something behind it; without backdrop-filter or when the user asks for less
-   transparency, fall back to the opaque charcoal surfaces of vrymnox-systems. */
+   transparency, fall back to the opaque charcoal surfaces. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   :root {
     --glass-raised-fill: var(--color-surface);

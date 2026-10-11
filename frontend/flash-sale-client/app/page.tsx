@@ -1,522 +1,215 @@
-"use client";
+import { ArrowRight, BadgePercent, PackageCheck, Tag, Truck } from "lucide-react";
+import Link from "next/link";
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type FormEvent,
-} from "react";
-import { Loader2 } from "lucide-react";
+import { BrandMark } from "@/components/hub/ui";
+import { CATEGORIES } from "@/components/storefront/categories";
+import { VipSignupForm } from "@/components/storefront/vip-signup-form";
+import { backendUrl } from "@/lib/backend-url";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardProduct,
-  CardTitle,
-} from "@/components/ui/card";
-
-/**
- * The sentence the form sends, and the two objects the API sends back.
- * extracted uses JavaScript numbers. dbRow.price is a string because
- * PostgreSQL NUMERIC is returned that way by node-pg.
- */
-type ExtractedProduct = {
-  name: string;
-  price: number;
-  stock: number;
-};
-
-type DbProductRow = {
-  id: number;
-  name: string;
-  price: string;
-  stock: number;
-  created_at: string;
-};
-
-type AddProductResponse = {
-  success: boolean;
-  extracted?: ExtractedProduct;
-  dbRow?: DbProductRow;
-  error?: string;
-};
-
-/**
- * Express flash-sale API.
- * Next.js also wants port 3000, so the API runs on 5000 and this page calls that host.
- * Set NEXT_PUBLIC_BACKEND_URL if the API moves again.
- */
-// Same origin: next.config.ts rewrites /api/* to Express, so the API needs no CORS.
-const API_BASE = "";
-
-/** How many units a single "Buy Now" click reserves. The API still enforces stock. */
-const PURCHASE_QUANTITY = 1;
-
-/** At or below this count the badge switches from "in stock" to "low". */
-const LOW_STOCK_THRESHOLD = 5;
-
-type Product = {
+type Deal = {
   product_id: number;
   name: string;
-  base_price: string | number;
+  description: string | null;
+  category: string;
+  base_price: string;
   stock: number;
 };
 
-type ProductsResponse = {
-  success: boolean;
-  products?: Product[];
-  error?: string;
-};
+// Re-render at most once a minute, including when the API was unreachable at build time.
+export const revalidate = 60;
 
-type PurchaseResponse = {
-  success: boolean;
-  message?: string;
-  error?: string;
-  product?: { stock: number };
-};
+const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
-type NoticeTone = "success" | "sold-out" | "error";
-
-type PurchaseNotice = {
-  tone: NoticeTone;
-  message: string;
-};
-
-function formatPrice(price: Product["base_price"]) {
-  const amount = typeof price === "number" ? price : Number(price);
-  if (Number.isNaN(amount)) return "—";
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(amount);
-}
-
-function stockLabel(stock: number) {
-  if (stock <= 0) return "Sold out";
-  if (stock <= LOW_STOCK_THRESHOLD) return `Low · ${stock} left`;
-  return `${stock} in stock`;
-}
-
-function stockVariant(stock: number): "destructive" | "outline" | "secondary" {
-  if (stock <= 0) return "destructive";
-  if (stock <= LOW_STOCK_THRESHOLD) return "outline";
-  return "secondary";
-}
-
-export default function FlashSaleInventoryManagerPage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [catalogState, setCatalogState] = useState<
-    "loading" | "ready" | "error"
-  >("loading");
-  const [catalogError, setCatalogError] = useState<string | null>(null);
-
-  /**
-   * Product ids whose purchase request is on the wire.
-   * A ref blocks a second click before React re-renders; state is what the
-   * button reads so the spinner and disabled styles appear immediately.
-   */
-  const inFlightIds = useRef<Set<number>>(new Set());
-  const [purchasingIds, setPurchasingIds] = useState<Set<number>>(new Set());
-  const [notices, setNotices] = useState<Record<number, PurchaseNotice>>({});
-  const [purchaseHistory, setPurchaseHistory] = useState<
-    {
-      flashSaleId: number;
-      quantity: number;
-      success: boolean;
-      message: string;
-      error: string;
-    }[]
-  >([]);
-  const [flashSalePurchaseResult, setFlashSalePurchaseResult] =
-    useState<PurchaseResponse | null>(null);
-  const [flashSalePurchasePending, setFlashSalePurchasePending] =
-    useState(false);
-  const [flashSalePurchaseError, setFlashSalePurchaseError] = useState<
-    string | null
-  >(null);
-  const [flashSalePurchaseMessage, setFlashSalePurchaseMessage] = useState<
-    string | null
-  >(null);
-  const [flashSalePurchaseSuccess, setFlashSalePurchaseSuccess] = useState<
-    boolean | null
-  >(null);
-  const [command, setCommand] = useState(
-    "Add 25 gaming monitors at 299.99 each",
-  );
-  const [commandPending, setCommandPending] = useState(false);
-  const [commandResult, setCommandResult] = useState<AddProductResponse | null>(
-    null,
-  );
-
-  const loadProducts = useCallback(async () => {
-    const response = await fetch(`${API_BASE}/api/products`, {
-      signal: AbortSignal.timeout(10000),
-      cache: "no-store",
+/** Listed stock from the public catalog. A storefront that cannot reach the API still renders. */
+async function loadDeals(): Promise<Deal[] | null> {
+  try {
+    const res = await fetch(`${backendUrl()}/api/products`, {
+      next: { revalidate: 60 },
+      signal: AbortSignal.timeout(4000),
     });
-    const body = (await response.json()) as ProductsResponse;
-
-    if (!response.ok || !body.success || !body.products) {
-      throw new Error(body.error ?? "Could not load the catalog.");
-    }
-
-    const products = body.products.map((product) => ({
-      ...product,
-      product_id: Number(product.product_id),
-      stock: Number(product.stock),
-      base_price: Number(product.base_price),
-      name: product.name,
-    }));
-    setProducts(products);
-    setCatalogState("ready");
-    setCatalogError(null);
-
-  }, []);
-
-  useEffect(() => {
-    void loadProducts();
-  }, [loadProducts]);
-
-
-  const inventoryCommand = useCallback(async (commandText: string) => {
-    const response = await fetch(`${API_BASE}/api/add-product`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ commandText }),
-    });
-    const data = (await response.json()) as AddProductResponse;
-    return data;
-  }, []);
-
-  const purchase = useCallback(
-    async (flashSaleId: number, quantity: number) => {
-      const response = await fetch(`${API_BASE}/api/purchase-flash-sale`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ flashSaleId, quantity }),
-      });
-      const data = (await response.json()) as PurchaseResponse;
-      return data;
-    },
-    [],
-  );
-
-  const showInventoryCommandResult = useCallback(async () => {
-    try {
-      const result = await inventoryCommand(command);
-      if (result.success) {
-        void loadProducts();
-      }
-      setCommandResult(result);
-    } catch (error: unknown) {
-      setCatalogError(
-        error instanceof Error
-          ? error.message
-          : "The command never reached the API.",
-      );
-    }
-  }, [
-    command,
-    loadProducts,
-    setProducts,
-    setCatalogState,
-    setCatalogError,
-    setCommandResult,
-  ]);
-
-  const syncFlashSalePurchasing = useCallback(
-    async (flashSaleId: number) => {
-      setPurchasingIds(new Set([...purchasingIds, flashSaleId]));
-    },
-    [purchasingIds, setPurchasingIds],
-  );
-
-  const syncPurchasing = useCallback(async () => {
-    setPurchasingIds(new Set(inFlightIds.current));
-  }, [inFlightIds.current, setPurchasingIds]);
-
-  const submitInventoryCommand = useCallback(async () => {
-    const commandText = command.trim();
-    if (!commandText || commandPending) return;
-
-    setCommandPending(true);
-    setCommandResult(null);
-
-    try {
-      // Same host as the catalog. backend/.env sets PORT=5000, so the
-      // form must not call a hardcoded port 4000.
-      const response = await fetch(`${API_BASE}/api/add-product`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commandText }),
-      });
-      const data = (await response.json()) as AddProductResponse;
-      setCommandResult(data);
-
-      if (response.ok && data.success) {
-        void loadProducts();
-      }
-    } catch (error: unknown) {
-      setCommandResult({
-        success: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "The command never reached the API.",
-      });
-    } finally {
-      setCommandPending(false);
-    }
-  }, [
-    commandPending,
-    command,
-    loadProducts,
-    setProducts,
-    setCatalogState,
-    setCatalogError,
-    setCommandResult,
-  ]);
-
-  const submitFlashSalePurchase = useCallback(
-    async (flashSaleId: number, quantity: number) => {
-      if (!flashSaleId || flashSalePurchasePending) return;
-
-      setFlashSalePurchaseResult(null);
-      setPurchaseHistory([
-        ...purchaseHistory,
-        { flashSaleId, quantity, success: false, message: "", error: "" },
-      ]);
-
-      try {
-        const response = await fetch(`${API_BASE}/api/purchase-flash-sale`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ flashSaleId, quantity }),
-        });
-        const data = (await response.json()) as PurchaseResponse;
-        setPurchaseHistory([
-          ...purchaseHistory,
-          {
-            flashSaleId,
-            quantity,
-            success: data.success,
-            message: data.message ?? "",
-            error: data.error ?? "",
-          },
-        ]);
-
-        if (response.ok && data.success) {
-          const fresh = await loadProducts();
-        }
-      } catch (error: unknown) {
-        setPurchaseHistory([
-          ...purchaseHistory,
-          {
-            flashSaleId,
-            quantity,
-            success: false,
-            message: "",
-            error:
-              error instanceof Error
-                ? error.message
-                : "The purchase request never reached the server.",
-          },
-        ]);
-        setFlashSalePurchaseError(
-          error instanceof Error
-            ? error.message
-            : "The purchase request never reached the server.",
-        );
-        setFlashSalePurchaseMessage(null);
-        setFlashSalePurchaseSuccess(false);
-      } finally {
-        setFlashSalePurchasePending(false);
-      }
-    },
-    [
-      flashSalePurchasePending,
-      purchaseHistory,
-      loadProducts,
-      setProducts,
-      setCatalogState,
-      setCatalogError,
-      setPurchaseHistory,
-      setFlashSalePurchaseError,
-      setFlashSalePurchaseMessage,
-      setFlashSalePurchaseSuccess,
-    ],
-  );
-  return (
-    <main className="min-h-screen bg-background p-6 md:p-10">
-      <div className="mx-auto max-w-6xl space-y-8">
-        {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Flash Sale Command Center
-          </h1>
-          <p className="text-muted-foreground">
-            Manage your live inventory and process flash sale checkouts.
-          </p>
-        </div>
-
-        {/* Grid Layout for Cards */}
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          {/* Card 1: Flash Sale Purchase Form */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Instant Purchase</CardTitle>
-              <CardDescription>
-                Secure your spot in the active flash sale.
-              </CardDescription>
-            </CardHeader>
-            <CardContent></CardContent>
-          </Card>
-
-          {/* Card 2: Inventory Command Tool */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Inventory Command</CardTitle>
-              <CardDescription>
-                Quick-add products using natural language commands.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <input
-                type="text"
-                value={command}
-                onChange={(e) => setCommand(e.target.value)}
-                placeholder="e.g., Add 50 mechanical keyboards for $99"
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              />
-              <Button
-                onClick={() => void submitInventoryCommand()}
-                disabled={!command.trim() || commandPending}
-                aria-busy={commandPending}
-                className="w-full"
-              >
-                {commandPending ? "Processing..." : "Run Command"}
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Card 3: Product Catalog Full-Width Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Live Product Catalog</CardTitle>
-            <CardDescription>
-              Currently available inventory synced from Supabase.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {products.length === 0 ? (
-              // Keeping your centered muted style specifically for the empty state box
-              <div
-                data-slot="card-product-empty"
-                className="flex flex-col gap-2 border rounded-md p-4 bg-muted/20 min-h-[150px] items-center justify-center text-muted-foreground"
-              >
-                <p>
-                  No products found. Run a command above to add your first
-                  product!
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {products.map((product) => (
-                  <CardProduct key={product.product_id}>
-                    {/* Product Title and Price */}
-                    <div className="flex justify-between items-start">
-                      <h3 className="font-semibold text-base">
-                        {product.name}
-                      </h3>
-                      <span className="font-bold text-primary text-lg">
-                        {formatPrice(product.base_price)}
-                      </span>
-                    </div>
-
-                    {/* Description */}
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {product.name || "No description provided."}
-                    </p>
-
-                    {/* Footer with Stock and ID */}
-                    <div className="flex justify-between items-center pt-2 border-t text-xs text-muted-foreground">
-                      <span className="bg-muted px-2 py-1 rounded font-medium">
-                        Stock: {product.stock}
-                      </span>
-                      <span>ID: {product.product_id}</span>
-                    </div>
-                  </CardProduct>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </main>
-  );
+    const body = (await res.json()) as { success?: boolean; products?: Deal[] };
+    return res.ok && body.success && body.products ? body.products.filter((p) => p.stock > 0) : null;
+  } catch {
+    return null;
+  }
 }
 
-function PurchaseHistory({
-  purchaseHistory,
-  submitFlashSalePurchase,
-}: {
-  purchaseHistory: {
-    flashSaleId: number;
-    quantity: number;
-    success: boolean;
-    message: string;
-    error: string;
-  }[];
-  submitFlashSalePurchase: (flashSaleId: number) => Promise<void>;
-}) {
+const PERKS = [
+  { icon: BadgePercent, title: "Up to 70% off retail", text: "Priced below wholesale on overstock and returns." },
+  { icon: PackageCheck, title: "Verified lots", text: "Every listing is inspected and graded before it goes live." },
+  { icon: Truck, title: "Single units to pallets", text: "Buy one open-box item or a full truckload." },
+];
+
+export default async function StorefrontPage() {
+  const deals = await loadDeals();
+
   return (
-    <ul className="space-y-4">
-      {purchaseHistory.map(
-        (purchase: {
-          flashSaleId: number;
-          quantity: number;
-          success: boolean;
-          message: string;
-          error: string;
-        }) => (
-          <li key={purchase.flashSaleId}>
-            <Card className="h-full">
-              <CardHeader>
-                <CardTitle>{purchase.flashSaleId}</CardTitle>
-                <CardDescription className="font-mono text-base text-foreground">
-                  {purchase.quantity}
-                </CardDescription>
-                <div className="pt-2">
-                  <Badge variant={purchase.success ? "default" : "destructive"}>
-                    {purchase.success ? "Success" : "Error"}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>{purchase.message}</CardContent>
-              <CardFooter>
-                <Button
-                  type="button"
-                  className="w-full"
-                  disabled={purchase.success}
-                  aria-busy={purchase.success}
-                  onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                    e.preventDefault();
-                    void submitFlashSalePurchase(purchase.flashSaleId);
-                  }}
-                >
-                  {purchase.success ? "Reserve again" : "Reserve"}
-                </Button>
-              </CardFooter>
-            </Card>
-          </li>
-        ),
-      )}
-    </ul>
+    <div className="ambient-canvas flex min-h-dvh flex-col">
+      <header className="sticky top-3 z-40 mx-3 sm:mx-6">
+        <nav
+          aria-label="Primary"
+          className="glass-overlay mx-auto flex h-16 max-w-6xl items-center gap-6 rounded-2xl px-4 sm:px-6"
+        >
+          <Link href="/" aria-label="Liquidation Hub home">
+            <BrandMark />
+          </Link>
+          <div className="ml-auto flex items-center gap-1 font-mono text-xs font-bold uppercase tracking-wider">
+            <a href="#categories" className="hidden rounded-lg px-3 py-1.5 text-ink-muted hover:text-brand md:block">
+              Categories
+            </a>
+            <a href="#deals" className="hidden rounded-lg px-3 py-1.5 text-ink-muted hover:text-brand md:block">
+              Deals
+            </a>
+            <a
+              href="#vip"
+              className="rounded-lg border border-brand/40 px-3 py-1.5 text-brand hover:bg-brand-tint"
+            >
+              VIP Club
+            </a>
+          </div>
+        </nav>
+      </header>
+
+      <main className="flex-1">
+        {/* Hero */}
+        <section className="relative mx-auto max-w-6xl px-4 pb-20 pt-20 sm:px-6 sm:pt-28">
+          <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+            <div className="absolute -left-32 top-10 size-[28rem] rounded-full bg-brand/10 blur-3xl motion-safe:animate-pulse [animation-duration:9s]" />
+          </div>
+          <div className="relative max-w-3xl">
+            <p className="inline-flex items-center gap-2 rounded-lg border border-brand/30 bg-brand-tint px-3 py-1 font-mono text-[11px] font-semibold uppercase tracking-wider text-brand">
+              <Tag className="size-3.5" aria-hidden />
+              New lots added daily
+            </p>
+            <h1 className="mt-6 text-4xl font-bold leading-[1.05] text-ink sm:text-6xl">
+              Exclusive Deals on Overstock &amp; Liquidation Inventory.
+            </h1>
+            <p className="mt-6 max-w-2xl text-lg leading-relaxed text-ink-muted">
+              Source verified overstock, open-box electronics, and wholesale liquidation lots at up to 70% off
+              retail prices.
+            </p>
+            <div className="mt-10 flex flex-col gap-3 sm:flex-row">
+              <a
+                href="#deals"
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-brand px-6 font-mono text-sm font-bold tracking-wide text-on-brand transition-colors hover:bg-brand-hover"
+              >
+                Browse Liquidation Deals
+                <ArrowRight className="size-4" aria-hidden />
+              </a>
+              <a
+                href="#vip"
+                className="inline-flex h-12 items-center justify-center rounded-xl border border-ink-muted px-6 font-mono text-sm font-bold tracking-wide text-ink transition-colors hover:border-brand hover:text-brand"
+              >
+                Join VIP Deals Club
+              </a>
+            </div>
+          </div>
+
+          <ul className="relative mt-16 grid gap-4 sm:grid-cols-3">
+            {PERKS.map(({ icon: Icon, title, text }) => (
+              <li key={title} className="glass-raised rounded-2xl p-5">
+                <Icon className="size-5 text-brand" aria-hidden />
+                <p className="mt-3 font-display font-semibold text-ink">{title}</p>
+                <p className="mt-1 text-sm text-ink-muted">{text}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        {/* Categories */}
+        <section id="categories" aria-labelledby="categories-title" className="mx-auto max-w-6xl scroll-mt-24 px-4 py-16 sm:px-6">
+          <h2 id="categories-title" className="text-3xl font-bold text-ink">
+            Shop by category
+          </h2>
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {CATEGORIES.map(({ name, icon: Icon, blurb }) => (
+              <a
+                key={name}
+                href="#deals"
+                className="group glass-raised flex flex-col rounded-2xl p-6 transition-transform hover:-translate-y-0.5"
+              >
+                <span className="grid size-12 place-items-center rounded-xl bg-brand-tint text-brand">
+                  <Icon className="size-6" aria-hidden />
+                </span>
+                <span className="mt-5 font-display text-lg font-semibold text-ink group-hover:text-brand">{name}</span>
+                <span className="mt-2 text-sm leading-relaxed text-ink-muted">{blurb}</span>
+              </a>
+            ))}
+          </div>
+        </section>
+
+        {/* Live deals */}
+        <section id="deals" aria-labelledby="deals-title" className="mx-auto max-w-6xl scroll-mt-24 px-4 py-16 sm:px-6">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <h2 id="deals-title" className="text-3xl font-bold text-ink">
+              Live liquidation deals
+            </h2>
+            <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-subtle">Updated every minute</p>
+          </div>
+
+          {deals && deals.length > 0 ? (
+            <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {deals.map((deal) => (
+                <li key={deal.product_id} className="surface-data flex flex-col rounded-2xl p-5">
+                  <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-ink-subtle">
+                    {deal.category}
+                  </span>
+                  <h3 className="mt-2 font-semibold text-ink">{deal.name}</h3>
+                  {deal.description && <p className="mt-1 line-clamp-2 text-sm text-ink-muted">{deal.description}</p>}
+                  <div className="mt-auto flex items-end justify-between pt-5">
+                    <span className="font-display text-2xl font-bold text-brand">
+                      {usd.format(Number(deal.base_price))}
+                    </span>
+                    <span
+                      className={
+                        deal.stock <= 5
+                          ? "font-mono text-xs font-semibold text-signal"
+                          : "font-mono text-xs text-ink-muted"
+                      }
+                    >
+                      {deal.stock <= 5 ? `Only ${deal.stock} left` : `${deal.stock} available`}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="surface-data mt-8 rounded-2xl p-10 text-center">
+              <p className="font-display text-lg font-semibold text-ink">
+                {deals ? "The current drop just sold out." : "Deals are loading slowly right now."}
+              </p>
+              <p className="mt-2 text-sm text-ink-muted">
+                Join the VIP Deals Club below and we&apos;ll email you when the next lots go live.
+              </p>
+            </div>
+          )}
+        </section>
+
+        {/* VIP Deals Club */}
+        <section id="vip" aria-labelledby="vip-title" className="mx-auto max-w-6xl scroll-mt-24 px-4 py-16 sm:px-6">
+          <div className="glass-overlay grid gap-10 rounded-3xl p-8 sm:p-12 lg:grid-cols-2">
+            <div>
+              <h2 id="vip-title" className="text-3xl font-bold text-ink">
+                Join the VIP Deals Club
+              </h2>
+              <p className="mt-4 leading-relaxed text-ink-muted">
+                Members hear about new pallets and open-box drops first, before they hit the public catalog. Pick
+                the categories you care about and we&apos;ll only send those.
+              </p>
+            </div>
+            <VipSignupForm />
+          </div>
+        </section>
+      </main>
+
+      <footer className="border-t border-line">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 py-8 text-sm text-ink-subtle sm:flex-row sm:px-6">
+          <p>© {new Date().getFullYear()} Liquidation Hub. All rights reserved.</p>
+          <Link href="/login" className="font-mono text-xs uppercase tracking-wider hover:text-brand">
+            Operator sign-in
+          </Link>
+        </div>
+      </footer>
+    </div>
   );
 }

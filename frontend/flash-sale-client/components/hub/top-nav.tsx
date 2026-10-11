@@ -14,10 +14,12 @@ export function TopNav({ user, onSignOut }: { user: HubUser | null; onSignOut: (
         aria-label="Primary"
         className="glass-overlay mx-auto flex h-16 max-w-[1440px] items-center gap-6 rounded-2xl px-4 sm:px-6"
       >
-        <BrandMark />
+        <Link href="/" aria-label="Liquidation Hub storefront">
+          <BrandMark />
+        </Link>
         <span className="hidden h-6 w-px bg-white/10 sm:block" aria-hidden />
         <span className="hidden font-mono text-[11px] uppercase tracking-[0.18em] text-ink-muted sm:block">
-          Liquidation Hub
+          Operator Console
         </span>
         <Link
           href="/inventory"

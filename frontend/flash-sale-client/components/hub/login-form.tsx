@@ -54,7 +54,7 @@ export function LoginForm({ next }: { next: string }) {
             onChange={(e) => setEmail(e.target.value)}
             aria-invalid={invalid}
             className="pl-10"
-            placeholder="operator@vrymnox.com"
+            placeholder="operator@liquidationhub.com"
           />
         </div>
       </Field>

@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * Modal on the native <dialog>: focus trap, Escape and inert background come from the browser
- * (same approach as vrymnox-systems confirm-dialog). Dialogs are layer 3, so they get full glass.
+ * Dialogs are layer 3, so they get full glass.
  */
 export function GlassDialog({
   open,
