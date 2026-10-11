@@ -1,0 +1,330 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/*
+ * Vrymnox Staged Portfolio Liquidation Hub: design tokens.
+ *
+ * Palette, type and geometry are lifted from vrymnox-systems:
+ *   frontend/ui/stitch_liquidation_hub_pro/.../industrial_high_contrast_commerce/DESIGN.md
+ *   frontend/ui/app/globals.css     (obsidian / charcoal / electric amber, cyan signal)
+ *   obsidian_vrymnox_agency_prompts/architecture/vrymnox-frontend_rounding_directive.md
+ *                                   (rounded-2xl containers, rounded-xl controls, rounded-lg badges)
+ *
+ * vrymnox-systems itself is flat (ghost borders, no blur, no shadows). The glass layers below
+ * are new to this hub and follow the Rule of Three Layers, so the flat look survives where data lives:
+ *   1. Base data   .surface-data   solid #111415 / #1a1d24, no transparency: tables, logs, inputs.
+ *   2. Raised      .glass-raised   light translucency + 1px refractive gradient edge: metric cards, panels.
+ *   3. Overlay     .glass-overlay  heavy frost + specular highlight: top nav, menus, modal dialogs only.
+ *
+ * Contrast (WCAG, computed): ink on data 17:1, ink-muted 7.3:1, ink-subtle 5:1 or better,
+ * brand on data 10.8:1, on-brand on brand 11.1:1, each status colour on its tint >= 8.5:1,
+ * line-strong vs surface 3.4:1 (non-text contrast for input borders).
+ */
+
+@custom-variant dark (&:is(.dark *));
+
+/* ---------------------------------------------------------------- Vrymnox tokens */
+@theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-space-grotesk), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-display);
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Surfaces: obsidian canvas, charcoal data planes. */
+  --color-canvas: #0c0e11;
+  --color-data: #111415;
+  --color-surface: #1a1d24;
+  --color-sunken: #23272f;
+  --color-line: #2f333b;
+  --color-line-strong: #6b717c;
+  --color-ink: #f4f5f7;
+  --color-ink-muted: #9da3ae;
+  --color-ink-subtle: #868c98;
+
+  /* Electric amber: actions, focus and the active state only, so it stays a signal. */
+  --color-brand: #ffba20;
+  --color-brand-hover: #ffffff;
+  --color-brand-tint: #2e2611;
+  --color-on-brand: #0f1115;
+  --color-focus: #ffba20;
+
+  /* Status. Cyan is the Stitch low-stock / telemetry signal. Tints are opaque for legibility. */
+  --color-success: #8fcfa3;
+  --color-success-tint: #142219;
+  --color-signal: #00e5ff;
+  --color-signal-tint: #0b262b;
+  --color-danger: #ffb4ab;
+  --color-danger-tint: #3a1a1b;
+  --color-info: #c4c6d0;
+  --color-info-tint: #262932;
+
+  /* shadcn components (components/ui/*) read these. */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  --animate-glass-in: glass-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  @keyframes glass-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px) scale(0.985);
+    }
+  }
+}
+
+/* The hub is dark-only; shadcn variables map onto the Vrymnox palette. */
+:root,
+.dark {
+  color-scheme: dark;
+  --radius: 0.625rem;
+  --background: #0c0e11;
+  --foreground: #f4f5f7;
+  --card: #1a1d24;
+  --card-foreground: #f4f5f7;
+  --popover: #1a1d24;
+  --popover-foreground: #f4f5f7;
+  --primary: #ffba20;
+  --primary-foreground: #0f1115;
+  --secondary: #23272f;
+  --secondary-foreground: #f4f5f7;
+  --muted: #23272f;
+  --muted-foreground: #9da3ae;
+  --accent: #23272f;
+  --accent-foreground: #f4f5f7;
+  --destructive: #ffb4ab;
+  --border: rgb(255 255 255 / 0.12);
+  --input: #45474b;
+  --ring: #ffba20;
+  --chart-1: #ffba20;
+  --chart-2: #00e5ff;
+  --chart-3: #8fcfa3;
+  --chart-4: #c4c6d0;
+  --chart-5: #ffb4ab;
+  --sidebar: #0c0f10;
+  --sidebar-foreground: #c6c6cb;
+  --sidebar-primary: #ffba20;
+  --sidebar-primary-foreground: #0f1115;
+  --sidebar-accent: #1d2022;
+  --sidebar-accent-foreground: #e1e2e4;
+  --sidebar-border: rgb(255 255 255 / 0.12);
+  --sidebar-ring: #ffba20;
+
+  /* Glass recipe, shared by the utilities below. */
+  --glass-edge: linear-gradient(
+    155deg,
+    rgb(255 255 255 / 0.3),
+    rgb(255 255 255 / 0.06) 35%,
+    rgb(255 255 255 / 0.03) 65%,
+    rgb(255 186 32 / 0.22)
+  );
+  --glass-raised-fill: linear-gradient(165deg, rgb(255 255 255 / 0.065), rgb(255 255 255 / 0.015) 55%),
+    rgb(26 29 36 / 0.55);
+  --glass-overlay-fill: linear-gradient(170deg, rgb(255 255 255 / 0.09), rgb(255 255 255 / 0.02) 45%),
+    rgb(17 20 21 / 0.6);
+}
+
+/* ---------------------------------------------------------------- layer 1: base data */
+@utility surface-data {
+  background-color: var(--color-data);
+  border: 1px solid var(--color-line);
+}
+
+/* ---------------------------------------------------------------- layer 2: raised glass */
+@utility glass-raised {
+  position: relative;
+  isolation: isolate;
+  background: var(--glass-raised-fill);
+  backdrop-filter: blur(14px) saturate(130%);
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
+
+  /* 1px refractive edge: a gradient painted only in the padding ring via mask-composite. */
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    padding: 1px;
+    border-radius: inherit;
+    background: var(--glass-edge);
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+}
+
+/* ---------------------------------------------------------------- layer 3: liquid glass overlay */
+@utility glass-overlay {
+  position: relative;
+  isolation: isolate;
+  background: var(--glass-overlay-fill);
+  backdrop-filter: blur(28px) saturate(170%) brightness(1.05);
+  -webkit-backdrop-filter: blur(28px) saturate(170%) brightness(1.05);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.14),
+    inset 0 -1px 0 rgb(0 0 0 / 0.35),
+    0 24px 64px -16px rgb(0 0 0 / 0.65);
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    padding: 1px;
+    border-radius: inherit;
+    background: var(--glass-edge);
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  /* Specular highlight: a soft hotspot catching light on the top-left edge. */
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: radial-gradient(120% 60% at 12% -10%, rgb(255 255 255 / 0.12), transparent 55%);
+    pointer-events: none;
+  }
+}
+
+/* Edge-glow focus vector for inputs on glass: amber 1px edge plus a short outer bloom. */
+@utility field-glow {
+  transition:
+    border-color 150ms ease,
+    box-shadow 200ms ease,
+    background-color 150ms ease;
+
+  &:focus,
+  &:focus-visible {
+    outline: none;
+    border-color: var(--color-brand);
+    background-color: var(--color-data);
+    box-shadow:
+      0 0 0 1px var(--color-brand),
+      0 0 22px -4px rgb(255 186 32 / 0.55),
+      inset 0 0 12px -6px rgb(255 186 32 / 0.35);
+  }
+}
+
+/* Ambient surface the login card floats over: two faint light pools and a fine engineering grid. */
+@utility ambient-canvas {
+  background-color: var(--color-canvas);
+  background-image:
+    radial-gradient(60rem 40rem at 15% 10%, rgb(255 186 32 / 0.09), transparent 60%),
+    radial-gradient(50rem 36rem at 90% 85%, rgb(0 229 255 / 0.06), transparent 60%),
+    linear-gradient(rgb(255 255 255 / 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.025) 1px, transparent 1px);
+  background-size:
+    auto,
+    auto,
+    48px 48px,
+    48px 48px;
+}
+
+/* Glass needs something behind it; without backdrop-filter or when the user asks for less
+   transparency, fall back to the opaque charcoal surfaces of vrymnox-systems. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root {
+    --glass-raised-fill: var(--color-surface);
+    --glass-overlay-fill: var(--color-surface);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-raised-fill: var(--color-surface);
+    --glass-overlay-fill: var(--color-surface);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    @apply font-sans;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-canvas text-ink;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--color-brand);
+    color: var(--color-on-brand);
+  }
+
+  dialog::backdrop {
+    background: rgb(5 6 8 / 0.55);
+    backdrop-filter: blur(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
