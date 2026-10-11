@@ -52,7 +52,8 @@ type AddProductResponse = {
  * Next.js also wants port 3000, so the API runs on 5000 and this page calls that host.
  * Set NEXT_PUBLIC_BACKEND_URL if the API moves again.
  */
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:4000";
+// Same origin: next.config.ts rewrites /api/* to Express, so the API needs no CORS.
+const API_BASE = "";
 
 /** How many units a single "Buy Now" click reserves. The API still enforces stock. */
 const PURCHASE_QUANTITY = 1;

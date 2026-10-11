@@ -1,7 +1,11 @@
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 
+import { serverError } from "./http-errors.js";
+import { createRateLimiter } from "./rate-limit.js";
+
 import { requireOwnerAdmin, startSession } from "./auth.js";
+import { ensureDefaultInventory } from "./db/showcase.js";
 
 /**
  * Portfolio demo mode: one-click sign-in for visitors, plus click analytics.
@@ -33,22 +37,7 @@ const visitorHash = (ip) =>
 const header = (req, name, max) => req.get(name)?.slice(0, max) || null;
 
 /** 20 demo sessions per IP per hour, so a script cannot flood sessions or inflate the analytics. */
-const starts = new Map();
-const WINDOW_MS = 60 * 60 * 1000;
-const MAX_STARTS = 20;
-function overLimit(ip) {
-  const now = Date.now();
-  if (starts.size > 10_000) {
-    for (const [k, v] of starts) if (now - v.first > WINDOW_MS) starts.delete(k);
-  }
-  const entry = starts.get(ip);
-  if (!entry || now - entry.first > WINDOW_MS) {
-    starts.set(ip, { first: now, count: 1 });
-    return false;
-  }
-  entry.count += 1;
-  return entry.count > MAX_STARTS;
-}
+const overLimit = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 20 });
 
 const DemoSchema = z.object({ kind: z.enum(["manager", "consumer"]) });
 
@@ -76,6 +65,9 @@ export function registerDemo(app, pool, requireAuth) {
     const account = DEMO_ACCOUNTS[parsed.data.kind];
 
     try {
+      // Heal before handing over the dashboard, so a previous visitor's deletions are already undone.
+      if (process.env.SHOWCASE_AUTOHEAL !== "false") await ensureDefaultInventory(pool, "demo start");
+
       // The password hash is not a valid scrypt string, so these accounts can never use /login.
       const { rows } = await pool.query(
         `INSERT INTO hub_users (email, display_name, password_hash, role, is_demo)
@@ -102,7 +94,7 @@ export function registerDemo(app, pool, requireAuth) {
 
       res.json({ success: true, user });
     } catch (err) {
-      res.status(500).json({ success: false, error: err.message });
+      serverError(res, err, `${req.method} ${req.path}`);
     }
   });
 
@@ -121,7 +113,7 @@ export function registerDemo(app, pool, requireAuth) {
       ]);
       res.json({ success: true, totals: totals.rows, daily: daily.rows, recent: recent.rows });
     } catch (err) {
-      res.status(500).json({ success: false, error: err.message });
+      serverError(res, err, `${req.method} ${req.path}`);
     }
   });
 }

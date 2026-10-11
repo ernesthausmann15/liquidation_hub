@@ -2,6 +2,8 @@ import { createHash, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { z } from "zod";
 
+import { serverError } from "./http-errors.js";
+
 const scryptAsync = promisify(scrypt);
 
 export const SESSION_COOKIE = "vx_session";
@@ -149,7 +151,7 @@ export function registerAuth(app, pool) {
       await startSession(pool, res, user.user_id);
       res.json({ success: true, user: publicUser(user) });
     } catch (err) {
-      res.status(500).json({ success: false, error: err.message });
+      serverError(res, err, `${req.method} ${req.path}`);
     }
   });
 
@@ -178,7 +180,7 @@ export function registerAuth(app, pool) {
       req.user = publicUser(rows[0]);
       next();
     } catch (err) {
-      res.status(500).json({ success: false, error: err.message });
+      serverError(res, err, `${req.method} ${req.path}`);
     }
   }
 

@@ -96,4 +96,20 @@ DEMO_ANALYTICS_SALT=any-long-random-string   # keeps unique-visitor counts stabl
   SELECT * FROM demo_click_daily ORDER BY day DESC;          -- clicks and unique visitors per day
   SELECT action_type, count(*) FROM demo_clicks GROUP BY 1;  -- all-time totals
   ```
-* Demo managers can change and delete real rows, so back up the portfolio data you show.
+* **Auto-heal:** in demo mode the API keeps 8 showcase items (`backend/db/showcase.js`, SKUs `VX-*`)
+  present. Missing ones are re-inserted on boot, hourly, and before every demo session starts; surviving
+  and edited rows are never touched or duplicated. `SHOWCASE_AUTOHEAL=false` turns it off. Outside demo
+  mode it never runs, so real inventory is never seeded.
+
+### Production (Render) checklist
+
+| Variable | Value | Why |
+| --- | --- | --- |
+| `NODE_ENV` | `production` | Marks the session cookie `Secure`; the server warns on Render if unset |
+| `TRUST_PROXY` | hop count, e.g. `1` or `2` | Real visitor IP for throttling and analytics. Sign in as owner and open `/api/admin/request-info`: `ip` must be your own address |
+| `DEMO_ANALYTICS_SALT` | long random string, never changed | Stable unique-visitor counts |
+| `BACKEND_URL` (frontend, at build time) | backend's URL | Target of the `/api` rewrite |
+
+Set Render's health check path to `/health` (returns `503` while the database is unreachable).
+Owner-only routes (not available to demo accounts): `POST /api/add-product` (OpenAI), `DELETE /api/orders/:id`,
+`GET /api/analytics/demo-clicks`. `GET /api/products` is the public catalog (listed and reserved items, no cost data).

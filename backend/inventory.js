@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { serverError } from "./http-errors.js";
+
 import { requireWriter } from "./auth.js";
 
 export const LIQUIDATION_STATUSES = ["staged", "listed", "reserved", "liquidated", "written_off"];
@@ -64,7 +66,7 @@ function pgError(res, err) {
   if (err.code === "23514") {
     return res.status(400).json({ success: false, error: "Value violates a database constraint." });
   }
-  return res.status(500).json({ success: false, error: err.message });
+  return serverError(res, err, "inventory query");
 }
 
 function parseId(raw) {
@@ -104,6 +106,8 @@ export function registerInventory(app, pool, requireAuth) {
         ),
         pool.query("SELECT DISTINCT category FROM products ORDER BY category"),
       ]);
+      // Per-item acquisition cost is internal: read-only viewers get valuation totals only.
+      if (req.user.role === "viewer") for (const row of items.rows) delete row.cost_basis;
       res.json({
         success: true,
         items: items.rows,
