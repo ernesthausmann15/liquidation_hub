@@ -20,7 +20,7 @@ export function InventoryGrid({
 }: {
   items: InventoryItem[];
   loading: boolean;
-  /** Viewers get no edit/delete column; the API would 403 them anyway. */
+  /** Viewers get no edit/delete or cost column; the API 403s their writes and omits cost_basis. */
   canWrite: boolean;
   onEdit: (item: InventoryItem) => void;
   onDelete: (item: InventoryItem) => void;
@@ -38,7 +38,7 @@ export function InventoryGrid({
               <th scope="col" className="px-4 py-3 font-medium">Status</th>
               <th scope="col" className="px-4 py-3 text-right font-medium">Units</th>
               <th scope="col" className="px-4 py-3 text-right font-medium">List / unit</th>
-              <th scope="col" className="px-4 py-3 text-right font-medium">Cost / unit</th>
+              {canWrite && <th scope="col" className="px-4 py-3 text-right font-medium">Cost / unit</th>}
               <th scope="col" className="px-4 py-3 text-right font-medium">Recovery value</th>
               <th scope="col" className="px-4 py-3 font-medium">Updated</th>
               {canWrite && (
@@ -74,9 +74,11 @@ export function InventoryGrid({
                     {low && <span className="sr-only"> (low stock)</span>}
                   </td>
                   <td className="px-4 py-3 text-right font-mono tabular-nums text-ink">{usd.format(item.base_price)}</td>
-                  <td className="px-4 py-3 text-right font-mono tabular-nums text-ink-muted">
-                    {item.cost_basis === null ? "—" : usd.format(item.cost_basis)}
-                  </td>
+                  {canWrite && (
+                    <td className="px-4 py-3 text-right font-mono tabular-nums text-ink-muted">
+                      {item.cost_basis == null ? "—" : usd.format(item.cost_basis)}
+                    </td>
+                  )}
                   <td
                     className={cn(
                       "px-4 py-3 text-right font-mono tabular-nums",

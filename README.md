@@ -101,15 +101,39 @@ DEMO_ANALYTICS_SALT=any-long-random-string   # keeps unique-visitor counts stabl
   and edited rows are never touched or duplicated. `SHOWCASE_AUTOHEAL=false` turns it off. Outside demo
   mode it never runs, so real inventory is never seeded.
 
-### Production (Render) checklist
+### Deploying to Render
 
-| Variable | Value | Why |
+`render.yaml` defines the Postgres database (`staged_vrymnox`), the API and the Next.js frontend.
+
+1. **Create the stack:** Render dashboard → New → Blueprint → select this repo. When prompted, set
+   `OPENAI_API_KEY` (only the owner-only `/api/add-product` uses it) and set `BACKEND_URL` to the API's
+   public URL, e.g. `https://vrymnox-hub-api.onrender.com`.
+2. **First boot** applies `backend/db/schema.sql` and seeds the showcase inventory automatically.
+   Check `https://vrymnox-hub-api.onrender.com/health` returns `{"status":"ok"}`.
+3. **Create your owner account** from your machine, using the database's *External Database URL*
+   (Render dashboard → vrymnox-hub-db → Connect):
+   ```bash
+   cd backend
+   DATABASE_URL="<External Database URL>?sslmode=require" node create-user.js you@vrymnox.com "Your Name" admin
+   ```
+4. **Calibrate `TRUST_PROXY`:** sign in on the frontend as the owner, open `/api/admin/request-info`.
+   If `ip` is not your own public address, add `TRUST_PROXY` on the API service (try `2`, then `3`)
+   until it is. This makes rate limits and unique-visitor counts per visitor instead of per proxy.
+5. **pgAdmin:** register a server with the External Database URL's host, port, database, user and
+   password, SSL mode `require`. `SELECT * FROM demo_click_daily ORDER BY day DESC;` shows engagement.
+
+| Variable (API) | Set by | Notes |
 | --- | --- | --- |
-| `NODE_ENV` | `production` | Marks the session cookie `Secure`; the server warns on Render if unset |
-| `TRUST_PROXY` | hop count, e.g. `1` or `2` | Real visitor IP for throttling and analytics. Sign in as owner and open `/api/admin/request-info`: `ip` must be your own address |
-| `DEMO_ANALYTICS_SALT` | long random string, never changed | Stable unique-visitor counts |
-| `BACKEND_URL` (frontend, at build time) | backend's URL | Target of the `/api` rewrite |
+| `NODE_ENV=production` | blueprint | Marks the session cookie `Secure`; the server warns on Render if unset |
+| `DATABASE_URL` | blueprint | Internal connection string of `vrymnox-hub-db` |
+| `DEMO_MODE=true` | blueprint | Demo buttons, showcase auto-heal |
+| `DEMO_ANALYTICS_SALT` | blueprint (generated once) | Never change it, or unique-visitor counts restart |
+| `TRUST_PROXY` | you, after step 4 | Defaults to `1` on Render, `loopback` locally |
+| `SHOWCASE_AUTOHEAL=false` | optional | Stops re-seeding the showcase items |
 
-Set Render's health check path to `/health` (returns `503` while the database is unreachable).
-Owner-only routes (not available to demo accounts): `POST /api/add-product` (OpenAI), `DELETE /api/orders/:id`,
-`GET /api/analytics/demo-clicks`. `GET /api/products` is the public catalog (listed and reserved items, no cost data).
+Frontend: `BACKEND_URL` is read **at build time** (the `/api` rewrite), so redeploy the frontend after
+changing it. The free plans sleep after inactivity; the first request after a sleep takes up to a minute.
+
+Owner-only routes (never demo accounts): `POST /api/add-product`, `DELETE /api/orders/:id`,
+`GET /api/analytics/demo-clicks`, `GET /api/admin/request-info`. Public routes: `GET /api/products`
+(listed and reserved items, no cost data), `POST /api/purchases` (30 per IP per 10 minutes), `/health`.

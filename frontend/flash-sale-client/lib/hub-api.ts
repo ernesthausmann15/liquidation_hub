@@ -22,7 +22,8 @@ export type InventoryItem = {
   category: string;
   liquidation_status: LiquidationStatus;
   base_price: number;
-  cost_basis: number | null;
+  /** Omitted by the API for read-only viewers. */
+  cost_basis?: number | null;
   stock: number;
   metadata: Record<string, unknown>;
   created_at: string;

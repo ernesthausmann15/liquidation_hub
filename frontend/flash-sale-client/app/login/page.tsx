@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { DemoButtons } from "@/components/hub/demo-buttons";
 import { LoginForm } from "@/components/hub/login-form";
 import { BrandMark } from "@/components/hub/ui";
+import { backendUrl } from "@/lib/backend-url";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -16,7 +17,7 @@ function safeNext(value: string | string[] | undefined) {
 /** Asks Express whether DEMO_MODE is on, so the buttons only render when they will work. */
 async function demoEnabled() {
   try {
-    const res = await fetch(`${process.env.BACKEND_URL ?? "http://localhost:4000"}/api/auth/demo`, {
+    const res = await fetch(`${backendUrl()}/api/auth/demo`, {
       cache: "no-store",
       signal: AbortSignal.timeout(3000),
     });
